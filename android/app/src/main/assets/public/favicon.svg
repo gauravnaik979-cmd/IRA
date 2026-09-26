@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="110" fill="url(#bgGrad)"/>
+  <path d="M 120 120 L 392 120 C 392 280 340 370 256 420 C 172 370 120 280 120 120 Z" fill="url(#shieldGrad)" />
+  <!-- Hostel Building Symbol -->
+  <polygon points="256,170 180,240 332,240" fill="#ffffff"/>
+  <rect x="200" y="240" width="112" height="90" fill="#ffffff"/>
+  <path d="M 236 280 A 20 20 0 0 1 276 280 L 276 330 L 236 330 Z" fill="#0f172a"/>
+</svg>

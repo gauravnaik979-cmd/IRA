@@ -1,0 +1,243 @@
+{
+  "entities": {
+    "student": {
+      "title": "Student",
+      "description": "Hostel student record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "rollNumber": { "type": "string" },
+        "name": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "department": { "type": "string" },
+        "semester": { "type": "string" },
+        "phone": { "type": "string" },
+        "guardianPhone": { "type": "string" },
+        "hostelName": { "type": "string" },
+        "roomNumber": { "type": "string" },
+        "bedNumber": { "type": "string" },
+        "qrId": { "type": "string" },
+        "messStatus": { "type": "string", "enum": ["active", "inactive"] },
+        "hostelStatus": { "type": "string", "enum": ["present", "absent", "leave"] },
+        "leaveStatus": { "type": "string", "enum": ["none", "pending", "approved", "rejected"] },
+        "admissionDate": { "type": "string" }
+      },
+      "required": ["id", "rollNumber", "name", "hostelName", "roomNumber"]
+    },
+    "attendance": {
+      "title": "Attendance",
+      "description": "NFC/QR/Manual scan records for hostel and mess daily attendance",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "rollNumber": { "type": "string" },
+        "hostelName": { "type": "string" },
+        "roomNumber": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "type": { "type": "string", "enum": ["hostel", "lunch", "dinner"] },
+        "status": { "type": "string", "enum": ["present", "absent", "leave"] },
+        "recordedBy": { "type": "string", "enum": ["scanner", "manual"] },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "studentId", "date", "type", "status", "recordedBy"]
+    },
+    "leaveRequest": {
+      "title": "LeaveRequest",
+      "description": "Student gate leave application request",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "rollNumber": { "type": "string" },
+        "department": { "type": "string" },
+        "hostelName": { "type": "string" },
+        "roomNumber": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string" },
+        "processedAt": { "type": "string" },
+        "processedBy": { "type": "string" }
+      },
+      "required": ["id", "studentId", "startDate", "endDate", "reason", "status", "createdAt"]
+    },
+    "room": {
+      "title": "Room",
+      "description": "Hostel room definition and occupancy state",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "hostelName": { "type": "string" },
+        "roomNumber": { "type": "string" },
+        "capacity": { "type": "number" },
+        "occupiedBeds": { "type": "number" },
+        "students": { "type": "array" }
+      },
+      "required": ["id", "hostelName", "roomNumber", "capacity", "occupiedBeds", "students"]
+    },
+    "hostel": {
+      "title": "Hostel",
+      "description": "Hostel building metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["Boys", "Girls"] },
+        "totalRooms": { "type": "number" },
+        "capacity": { "type": "number" }
+      },
+      "required": ["id", "name", "type", "totalRooms", "capacity"]
+    },
+    "mealRates": {
+      "title": "MealRates",
+      "description": "Current pricing configurations per meal type",
+      "type": "object",
+      "properties": {
+        "lunchPrice": { "type": "number" },
+        "dinnerPrice": { "type": "number" }
+      },
+      "required": ["lunchPrice", "dinnerPrice"]
+    },
+    "monthlyBill": {
+      "title": "MonthlyBill",
+      "description": "Calculated student mess bills for active and historical months",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "rollNumber": { "type": "string" },
+        "department": { "type": "string" },
+        "roomNumber": { "type": "string" },
+        "month": { "type": "string" },
+        "lunchCount": { "type": "number" },
+        "dinnerCount": { "type": "number" },
+        "leaveDays": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["unpaid", "paid"] },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "studentId", "month", "totalAmount", "status", "updatedAt"]
+    },
+    "notification": {
+      "title": "Notification",
+      "description": "Broadcast alerts and personalized inbox events",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["announcement", "leave_status", "mess_toggle", "emergency"] },
+        "target": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "sender": { "type": "string" }
+      },
+      "required": ["id", "title", "message", "type", "target", "createdAt", "sender"]
+    },
+    "notice": {
+      "title": "Notice",
+      "description": "Official hostel notices, announcements and alerts published by superintendents",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "hostelId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "priority": { "type": "string", "enum": ["normal", "important", "emergency"] },
+        "audienceType": { "type": "string", "enum": ["all", "department", "semester", "room", "individual"] },
+        "audienceValue": { "type": "string" },
+        "attachmentURL": { "type": "string" },
+        "attachmentName": { "type": "string" },
+        "attachmentType": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "expiresAt": { "type": "string" },
+        "isPinned": { "type": "boolean" },
+        "deliveryStatus": { "type": "string", "enum": ["sent", "delivered"] }
+      },
+      "required": ["id", "hostelId", "title", "description", "priority", "audienceType", "createdBy", "createdAt"]
+    },
+    "auditLog": {
+      "title": "AuditLog",
+      "description": "Audit log records for deleted attendance scans and system corrections",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "superintendentId": { "type": "string" },
+        "hostelId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "attendanceId": { "type": "string" },
+        "reason": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "superintendentId", "hostelId", "studentId", "attendanceId", "reason", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "userProfile",
+      "description": "User metadata linking authentication UID to system role and assigned hostel"
+    },
+    "/hostels/{hostelId}": {
+      "schema": "hostel",
+      "description": "Master collection of hostels"
+    },
+    "/hostels/{hostelId}/students/{studentId}": {
+      "schema": "student",
+      "description": "Isolated student profiles for a specific hostel"
+    },
+    "/hostels/{hostelId}/attendance/{attendanceId}": {
+      "schema": "attendance",
+      "description": "Isolated attendance scan records for a specific hostel"
+    },
+    "/hostels/{hostelId}/monthlyBills/{monthlyBillId}": {
+      "schema": "monthlyBill",
+      "description": "Isolated monthly mess bills for a specific hostel"
+    },
+    "/hostels/{hostelId}/mealSessions/{sessionId}": {
+      "schema": "mealSession",
+      "description": "Isolated active and historic meal sessions per hostel"
+    },
+    "/hostels/{hostelId}/notices/{noticeId}": {
+      "schema": "notice",
+      "description": "Isolated official hostel notices per hostel"
+    },
+    "/hostels/{hostelId}/reports/{reportId}": {
+      "schema": "dailyMealReport",
+      "description": "Isolated daily mess reports per hostel"
+    },
+    "/hostels/{hostelId}/leaveApplications/{leaveId}": {
+      "schema": "leaveRequest",
+      "description": "Isolated gate leave applications per hostel"
+    },
+    "/hostels/{hostelId}/transactionLogs/{logId}": {
+      "schema": "auditLog",
+      "description": "Isolated audit transaction logs per hostel"
+    },
+    "/hostels/{hostelId}/staff/{staffId}": {
+      "schema": "staff",
+      "description": "Isolated hostel staff members per hostel"
+    },
+    "/students/{studentId}": {
+      "schema": "student",
+      "description": "Legacy fallback student collection"
+    },
+    "/attendance/{attendanceId}": {
+      "schema": "attendance",
+      "description": "Legacy fallback attendance collection"
+    },
+    "/leaveRequests/{leaveRequestId}": {
+      "schema": "leaveRequest",
+      "description": "Legacy fallback leave collection"
+    },
+    "/monthlyBills/{monthlyBillId}": {
+      "schema": "monthlyBill",
+      "description": "Legacy fallback monthly bills collection"
+    }
+  }
+}

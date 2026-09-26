@@ -1,0 +1,6 @@
+{
+  "name": "IRA Hostel",
+  "description": "AI-Powered Hostel & Mess Management System with QR attendance, automated bill calculations, real-time leaves review, and an embedded collegiate AI advisor assistant.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

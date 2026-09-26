@@ -1,0 +1,11 @@
+{
+  "projectId": "ira-hostel",
+  "appId": "1:960894763161:web:b56b4bf13cd96a1f5eb808",
+  "apiKey": "AIzaSyDuJDTtthc0y0zuxuOvpuQZDZmVzAF2YWQ",
+  "authDomain": "ira-hostel.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "ira-hostel.firebasestorage.app",
+  "messagingSenderId": "960894763161",
+  "measurementId": "G-78RCRTY92C",
+  "oAuthClientId": "533168410607-7ukghu8j219t5s1426357icmpv75otfl.apps.googleusercontent.com"
+}

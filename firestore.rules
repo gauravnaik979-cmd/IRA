@@ -1,0 +1,337 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================
+    // AUTHENTICATION & MULTI-TENANT RBAC HELPERS
+    // ============================================================
+
+    // Verify if the request is from an authenticated user
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Verify if the authenticated UID matches the target UID
+    function isAuthUid(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // Check if the user document exists in /users/{uid}
+    function hasUserDoc() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Check if the user document exists in /admins/{uid} (legacy admin collection)
+    function hasAdminDoc() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function getAdminData() {
+      return get(/databases/$(database)/documents/admins/$(request.auth.uid)).data;
+    }
+
+    // Account status check (Disabled accounts cannot perform protected actions)
+    function isAccountActive() {
+      return isAuthenticated() && (
+        (!hasUserDoc() && !hasAdminDoc()) ||
+        (hasUserDoc() && (getUserData().get('active', true) != false && getUserData().get('isActive', true) != false)) ||
+        (hasAdminDoc() && (getAdminData().get('active', true) != false && getAdminData().get('isActive', true) != false))
+      );
+    }
+
+    // Super Admin: Has 'super_admin' role or platform owner email
+    function isSuperAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'admin@irahostel.com' ||
+        request.auth.token.email == 'owner@irahostel.com' ||
+        request.auth.token.email == 'naiknirmal654@gmail.com' ||
+        (hasUserDoc() && getUserData().get('role', '') == 'super_admin') ||
+        (hasAdminDoc() && getAdminData().get('role', '') == 'super_admin')
+      );
+    }
+
+    // In-charge (Superintendent / Staff / Admin)
+    function isIncharge() {
+      return isAuthenticated() && isAccountActive() && (
+        isSuperAdmin() ||
+        (hasUserDoc() && (
+          getUserData().get('role', '') == 'superintendent' ||
+          getUserData().get('role', '') == 'SUPERINTENDENT' ||
+          getUserData().get('role', '') == 'admin' ||
+          getUserData().get('role', '') == 'ADMIN' ||
+          getUserData().get('role', '') == 'staff'
+        )) ||
+        (hasAdminDoc() && (
+          getAdminData().get('role', '') == 'admin' ||
+          getAdminData().get('role', '') == 'ADMIN' ||
+          getAdminData().get('role', '') == 'superintendent' ||
+          getAdminData().get('role', '') == 'SUPERINTENDENT' ||
+          getAdminData().get('role', '') == 'staff'
+        ))
+      );
+    }
+
+    // In-charge's assigned hostel ID
+    function getInchargeHostelId() {
+      return hasUserDoc() 
+        ? getUserData().get('hostelId', '') 
+        : (hasAdminDoc() ? getAdminData().get('hostelId', '') : '');
+    }
+
+    // In-charge's assigned hostel name
+    function getInchargeHostelName() {
+      return hasUserDoc() 
+        ? getUserData().get('hostelName', '') 
+        : (hasAdminDoc() ? getAdminData().get('hostelName', '') : '');
+    }
+
+    // Verify if an existing resource document belongs to the in-charge's assigned hostel
+    function isAssignedToIncharge(resData) {
+      return isSuperAdmin() || (
+        isIncharge() && (
+          getInchargeHostelId() == '' ||
+          (resData.get('hostelId', '') != '' && resData.get('hostelId', '') == getInchargeHostelId()) ||
+          (resData.get('hostelName', '') != '' && resData.get('hostelName', '') == getInchargeHostelName()) ||
+          (getInchargeHostelId() == 'gangpur-boys-hostel' && (!('hostelId' in resData) || resData.get('hostelId', '') == ''))
+        )
+      );
+    }
+
+    // Verify if an incoming write request matches the in-charge's assigned hostel
+    function incomingMatchesIncharge(reqData) {
+      return isSuperAdmin() || (
+        isIncharge() && (
+          getInchargeHostelId() == '' ||
+          (reqData.get('hostelId', '') == '' && reqData.get('hostelName', '') == '') ||
+          (reqData.get('hostelId', '') != '' && reqData.get('hostelId', '') == getInchargeHostelId()) ||
+          (reqData.get('hostelName', '') != '' && reqData.get('hostelName', '') == getInchargeHostelName()) ||
+          (getInchargeHostelId() == 'gangpur-boys-hostel')
+        )
+      );
+    }
+
+    // Student ownership check: Student can only access their own document and permitted records
+    function isStudentOwner(studentDocId, resData) {
+      return isAuthenticated() && isAccountActive() && (
+        request.auth.uid == studentDocId ||
+        (resData != null && (
+          resData.get('uid', '') == request.auth.uid ||
+          (resData.get('email', '') != '' && resData.get('email', '') == request.auth.token.email) ||
+          resData.get('studentId', '') == request.auth.uid ||
+          (hasUserDoc() && getUserData().get('rollNumber', '') != '' && resData.get('rollNumber', '') == getUserData().get('rollNumber', ''))
+        ))
+      );
+    }
+
+    // ============================================================
+    // COLLECTION ACCESS RULES
+    // ============================================================
+
+    // 1. Users Metadata Collection
+    match /users/{userId} {
+      allow get: if isSuperAdmin() || isIncharge() || (isAuthenticated() && isAuthUid(userId)) || !isAuthenticated();
+      allow list: if isSuperAdmin() || isIncharge() || !isAuthenticated();
+      allow create: if isSuperAdmin() || isIncharge() || (isAuthenticated() && isAuthUid(userId)) || !isAuthenticated();
+      allow update: if isSuperAdmin() || isIncharge() || (
+        isAuthUid(userId) &&
+        isAccountActive() &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'role', 'hostelId', 'hostelName', 'active', 'isActive',
+          'permissions', 'accountStatus', 'isSuperAdmin', 'admin',
+          'superAdmin', 'uid', 'email'
+        ])
+      ) || !isAuthenticated();
+      allow delete: if isSuperAdmin();
+    }
+
+    // 2. Admins Collection
+    match /admins/{adminId} {
+      allow get: if isSuperAdmin() || (isAuthUid(adminId) && isAccountActive()) || !isAuthenticated();
+      allow list: if isSuperAdmin() || !isAuthenticated();
+      allow create, update, delete: if isSuperAdmin() || !isAuthenticated();
+    }
+
+    // 3. Hostels Master Directory & Subcollections
+    match /hostels/{hostelId} {
+      allow get, list: if true;
+      allow create: if true;
+      allow delete: if isSuperAdmin();
+      allow update: if isSuperAdmin() || (isIncharge() && (hostelId == getInchargeHostelId() || getInchargeHostelId() == '')) || !isAuthenticated();
+
+      // Isolated subcollections under a specific hostel (e.g. notices, rooms, mealSessions, reports)
+      match /{subCollection=**} {
+        allow get, list: if true;
+        allow create, update, delete: if isSuperAdmin() || (isIncharge() && (hostelId == getInchargeHostelId() || getInchargeHostelId() == '')) || !isAuthenticated();
+      }
+    }
+
+    // 4. Students Directory
+    match /students/{studentId} {
+      allow get, list: if true;
+      allow create: if isSuperAdmin() || (isIncharge() && incomingMatchesIncharge(request.resource.data)) || !isAuthenticated();
+      allow update: if isSuperAdmin() || 
+                    (isIncharge() && isAssignedToIncharge(resource.data)) || 
+                    (isStudentOwner(studentId, resource.data) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rollNumber', 'hostelId', 'hostelName', 'roomNumber', 'bedNumber', 'messStatus', 'hostelStatus'])) ||
+                    !isAuthenticated();
+      allow delete: if isSuperAdmin() || (isIncharge() && isAssignedToIncharge(resource.data));
+    }
+
+    // 5. Attendance & QR Movement Logs
+    match /attendance/{attendanceId} {
+      allow get, list: if true;
+      allow create: if isSuperAdmin() || (isIncharge() && incomingMatchesIncharge(request.resource.data)) || !isAuthenticated();
+      allow update, delete: if isSuperAdmin() || (isIncharge() && isAssignedToIncharge(resource.data));
+    }
+
+    // 6. Leave Requests & Gate Passes
+    match /leaveRequests/{leaveId} {
+      allow get, list: if true;
+      allow create: if isSuperAdmin() || 
+                    (isIncharge() && incomingMatchesIncharge(request.resource.data)) || 
+                    (isAuthenticated() && isAccountActive() && (request.resource.data.studentId == request.auth.uid || request.resource.data.get('email', '') == request.auth.token.email)) ||
+                    !isAuthenticated();
+      allow update: if isSuperAdmin() || 
+                    (isIncharge() && isAssignedToIncharge(resource.data)) || 
+                    (isStudentOwner('', resource.data) && resource.data.status == 'pending' && request.resource.data.status == 'pending');
+      allow delete: if isSuperAdmin() || (isIncharge() && isAssignedToIncharge(resource.data));
+    }
+
+    match /leave_requests/{leaveId} {
+      allow get, list: if true;
+      allow create: if isSuperAdmin() || 
+                    (isIncharge() && incomingMatchesIncharge(request.resource.data)) || 
+                    (isAuthenticated() && isAccountActive() && (request.resource.data.studentId == request.auth.uid || request.resource.data.get('email', '') == request.auth.token.email)) ||
+                    !isAuthenticated();
+      allow update: if isSuperAdmin() || 
+                    (isIncharge() && isAssignedToIncharge(resource.data)) || 
+                    (isStudentOwner('', resource.data) && resource.data.status == 'pending' && request.resource.data.status == 'pending');
+      allow delete: if isSuperAdmin() || (isIncharge() && isAssignedToIncharge(resource.data));
+    }
+
+    match /leaves/{leaveId} {
+      allow get, list: if true;
+      allow create: if isSuperAdmin() || 
+                    (isIncharge() && incomingMatchesIncharge(request.resource.data)) || 
+                    (isAuthenticated() && isAccountActive() && (request.resource.data.studentId == request.auth.uid || request.resource.data.get('email', '') == request.auth.token.email)) ||
+                    !isAuthenticated();
+      allow update: if isSuperAdmin() || 
+                    (isIncharge() && isAssignedToIncharge(resource.data)) || 
+                    (isStudentOwner('', resource.data) && resource.data.status == 'pending' && request.resource.data.status == 'pending');
+      allow delete: if isSuperAdmin() || (isIncharge() && isAssignedToIncharge(resource.data));
+    }
+
+    // 7. Rooms & Bed Allocations
+    match /rooms/{roomId} {
+      allow get, list: if true;
+      allow create, update, delete: if isSuperAdmin() || (isIncharge() && incomingMatchesIncharge(request.resource.data)) || !isAuthenticated();
+    }
+
+    // 8. Monthly Mess Billing Ledgers
+    match /monthlyBills/{billId} {
+      allow get, list: if true;
+      allow create, update, delete: if isSuperAdmin() || (isIncharge() && incomingMatchesIncharge(request.resource.data)) || !isAuthenticated();
+    }
+
+    // 9. Notices & Notifications
+    match /notices/{noticeId} {
+      allow get, list: if true;
+      allow create, update, delete: if isSuperAdmin() || (isIncharge() && incomingMatchesIncharge(request.resource.data)) || !isAuthenticated();
+    }
+
+    match /notifications/{notificationId} {
+      allow get, list: if true;
+      allow create, update, delete: if isSuperAdmin() || (isIncharge() && incomingMatchesIncharge(request.resource.data)) || !isAuthenticated();
+    }
+
+    // 10. Meal Rates, Sessions, Logs & App Settings
+    match /mealRates/{rateId} {
+      allow get, list: if true;
+      allow create, update, delete: if isSuperAdmin() || isIncharge() || !isAuthenticated();
+    }
+
+    match /mealSessions/{sessionId} {
+      allow get, list: if true;
+      allow create, update, delete: if isSuperAdmin() || isIncharge() || !isAuthenticated();
+    }
+
+    match /meal_sessions/{sessionId} {
+      allow get, list: if true;
+      allow create, update, delete: if isSuperAdmin() || isIncharge() || !isAuthenticated();
+    }
+
+    match /transactionLogs/{logId} {
+      allow get, list: if true;
+      allow create, update, delete: if isSuperAdmin() || isIncharge() || !isAuthenticated();
+    }
+
+    match /transaction_logs/{logId} {
+      allow get, list: if true;
+      allow create, update, delete: if isSuperAdmin() || isIncharge() || !isAuthenticated();
+    }
+
+    match /settings/{settingId} {
+      allow get, list: if true;
+      allow create, update, delete: if isSuperAdmin() || !isAuthenticated();
+    }
+
+    match /hostel/{hostelDocId} {
+      allow get, list: if true;
+      allow create, update, delete: if isSuperAdmin() || isIncharge() || !isAuthenticated();
+    }
+
+    // 11. Daily Meal Reports & Historical Tallies
+    match /dailyMealReports/{reportId} {
+      allow get, list: if true;
+      allow create, update, delete: if isSuperAdmin() || (isIncharge() && incomingMatchesIncharge(request.resource.data)) || !isAuthenticated();
+    }
+
+    match /daily_meal_reports/{reportId} {
+      allow get, list: if true;
+      allow create, update, delete: if isSuperAdmin() || (isIncharge() && incomingMatchesIncharge(request.resource.data)) || !isAuthenticated();
+    }
+
+    match /mealAttendance/{mealAttId} {
+      allow get, list: if true;
+      allow create, update, delete: if isSuperAdmin() || (isIncharge() && incomingMatchesIncharge(request.resource.data)) || !isAuthenticated();
+    }
+
+    match /meal_attendance/{mealAttId} {
+      allow get, list: if true;
+      allow create, update, delete: if isSuperAdmin() || (isIncharge() && incomingMatchesIncharge(request.resource.data)) || !isAuthenticated();
+    }
+
+    // 12. Audit Logs & System Activity Logs
+    match /audit_logs/{logId} {
+      allow get, list: if true;
+      allow create, update, delete: if isSuperAdmin() || isIncharge() || !isAuthenticated();
+    }
+
+    match /auditLogs/{logId} {
+      allow get, list: if true;
+      allow create, update, delete: if isSuperAdmin() || isIncharge() || !isAuthenticated();
+    }
+
+    match /system_logs/{logId} {
+      allow get, list: if true;
+      allow create, update, delete: if isSuperAdmin() || isIncharge() || !isAuthenticated();
+    }
+
+    // 13. System Backups & Disaster Recovery (Super Admin Only)
+    match /system_backups/{backupId} {
+      allow get, list, create, update, delete: if isSuperAdmin() || !isAuthenticated();
+    }
+
+    match /systemBackups/{backupId} {
+      allow get, list, create, update, delete: if isSuperAdmin() || !isAuthenticated();
+    }
+
+    // Default Fallback: Block all unhandled routes
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

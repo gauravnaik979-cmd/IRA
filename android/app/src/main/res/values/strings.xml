@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">IRA Hostel</string>
+    <string name="title_activity_main">IRA Hostel</string>
+    <string name="package_name">com.ira.hostel</string>
+    <string name="custom_url_scheme">com.ira.hostel</string>
+</resources>
